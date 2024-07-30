@@ -8,10 +8,10 @@ const barlow = Barlow({
  variable: '--font-barlow',
 });
 import { cn } from '@/lib/utils';
+import Provider from '@/provider';
 
 export const metadata: Metadata = {
- title: 'The Muslim Ticket',
- description: 'Look for Muslim Events All Over The Globe with Us.',
+ title: 'Nextjs template with shadcn.',
 };
 
 export default function RootLayout({
@@ -20,15 +20,18 @@ export default function RootLayout({
  children: React.ReactNode;
 }>) {
  return (
-  <html lang="en">
+  <html lang="en" suppressHydrationWarning>
    <body
     className={cn(
      'min-h-screen bg-background font-barlow antialiased',
      barlow.variable,
      barlow.className
     )}
-   >
+             >
+                   <Provider session={undefined}>
+                         
     {children}
+                   </Provider>
    </body>
   </html>
  );
