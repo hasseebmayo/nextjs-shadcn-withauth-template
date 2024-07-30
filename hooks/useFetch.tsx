@@ -1,6 +1,6 @@
 'use client';
 import { API_URL } from '@/lib/constants';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import axios from 'axios';
 import useAuth from './use-auth';
 
@@ -13,9 +13,7 @@ export type FetchApiType = {
 interface IUseFetch<T> {
  path: string;
  queryKey: string[];
- // eslint-disable-next-line @typescript-eslint/no-explicit-any
- config?: any;
- extra?: T;
+ config?: Omit<UseQueryOptions<T, Error>, 'queryKey' | 'queryFn'>;
 }
 
 export function useFetch<T>({ path, queryKey, config }: IUseFetch<T>) {
@@ -24,29 +22,35 @@ export function useFetch<T>({ path, queryKey, config }: IUseFetch<T>) {
  if (!path) throw new Error('path is required');
  const REQUEST_URL = `${API_URL}/${path}`;
 
- const fetchData = async () => {
+ const fetchData = async (): Promise<T> => {
   try {
    const response = await axios.get(REQUEST_URL, {
     headers: {
      Authorization: `Bearer ${token}`,
     },
    });
-   return response.data.data;
+   console.log(response);
+   return response.data;
    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
-   // Handle errors if needed
+   if (!error.response) {
+    throw new Error('Network error, please check your internet connection.');
+   }
+   if (error.response.status === 401) {
+    console.log('Unauthorized access, logging out...');
+    // Add your function here
+   }
+   throw error;
   }
  };
 
- const { data, isLoading, refetch, status, error } = useQuery<T>({
-  queryKey: queryKey,
+ const { data, isLoading, refetch, status, error } = useQuery<T, Error>({
+  queryKey,
   queryFn: fetchData,
   refetchOnWindowFocus: false,
   staleTime: config?.staleTime ?? 60 * 5,
   ...config,
  });
 
- const response: T | undefined = data;
-
- return { response, isLoading, refetch, status, error };
+ return { data, isLoading, refetch, status, error };
 }
