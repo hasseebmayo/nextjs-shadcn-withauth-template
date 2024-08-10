@@ -1,60 +1,69 @@
+'use client';
+
 import {
- CommandGroup,
- CommandItem,
+ Command,
  CommandList,
  CommandInput,
-} from './command';
-import { Command as CommandPrimitive } from 'cmdk';
-import { useState, useRef, useCallback, type KeyboardEvent } from 'react';
+ CommandItem,
+ CommandGroup,
+ CommandEmpty,
+ CommandSeparator,
+} from '@/components/ui/command';
+import { cn } from '@/lib/utils';
+import React, { KeyboardEvent, useCallback, useRef, useState } from 'react';
 
-import { Skeleton } from './skeleton';
-import { cn } from '../../lib/utils';
+export type Option = {
+ value: string;
+ label: string;
+} & Record<string, string>;
 
-export type Option = Record<'value' | 'label', string> & Record<string, string>;
-
-type AutoCompleteProps = {
- options: Option[];
- emptyMessage: string;
- value?: Option;
- onValueChange?: (value: Option) => void;
- isLoading?: boolean;
- disabled?: boolean;
- placeholder?: string;
+export type GroupOption = {
+ heading: string;
+ option: Option[];
 };
 
-export const AutoComplete = ({
- options,
- placeholder,
- emptyMessage,
- value,
- onValueChange,
- disabled,
- isLoading = false,
-}: AutoCompleteProps) => {
- const inputRef = useRef<HTMLInputElement>(null);
+type SearchCompleteProps =
+ | { type: 'option'; options: Option[] }
+ | { type: 'group'; options: GroupOption[] };
 
- const [isOpen, setOpen] = useState(false);
- const [selected, setSelected] = useState<Option>(value as Option);
- const [inputValue, setInputValue] = useState<string>(value?.label || '');
+export default function SearchComplete({
+ options,
+ type,
+ placeholder = 'Search here....',
+ onSelect,
+}: SearchCompleteProps & {
+ onSelect?: (value: string) => void;
+ placeholder?: string;
+}) {
+ const inputRef = useRef<HTMLInputElement>(null);
+ const [isOpen, setOpen] = useState(true);
+ const [inputValue, setInputValue] = useState('');
 
  const handleKeyDown = useCallback(
   (event: KeyboardEvent<HTMLDivElement>) => {
    const input = inputRef.current;
-   if (!input) {
-    return;
-   }
+   if (!input) return;
 
-   // Keep the options displayed when the user is typing
-   if (!isOpen) {
-    setOpen(true);
-   }
+   if (!isOpen) setOpen(true);
 
-   // This is not a default behaviour of the <input /> field
    if (event.key === 'Enter' && input.value !== '') {
-    const optionToSelect = options.find(option => option.label === input.value);
+    let optionToSelect: Option | null = null;
+
+    if (type === 'option') {
+     optionToSelect =
+      options.find(option => option.label === input.value) || null;
+    } else if (type === 'group') {
+     // Search within grouped options
+     for (const group of options as GroupOption[]) {
+      optionToSelect =
+       group.option.find(opt => opt.label === input.value) || null;
+      if (optionToSelect) break;
+     }
+    }
+
     if (optionToSelect) {
-     setSelected(optionToSelect);
-     onValueChange?.(optionToSelect);
+     setInputValue(optionToSelect.label);
+     setOpen(false);
     }
    }
 
@@ -62,88 +71,86 @@ export const AutoComplete = ({
     input.blur();
    }
   },
-  [isOpen, options, onValueChange]
+  [isOpen, options, type]
  );
+ const handleSelect = (val: string) => {
+  setInputValue(val);
+  setOpen(false);
+  onSelect?.(val);
+ };
 
  const handleBlur = useCallback(() => {
   setOpen(false);
-  setInputValue(selected?.label);
- }, [selected]);
-
- const handleSelectOption = useCallback(
-  (selectedOption: Option) => {
-   setInputValue(selectedOption.label);
-
-   setSelected(selectedOption);
-   onValueChange?.(selectedOption);
-
-   // This is a hack to prevent the input from being focused after the user selects an option
-   // We can call this hack: "The next tick"
-   setTimeout(() => {
-    inputRef?.current?.blur();
-   }, 0);
-  },
-  [onValueChange]
- );
+ }, []);
 
  return (
-  <CommandPrimitive onKeyDown={handleKeyDown}>
-   <div className="rounded-md border">
+  <Command
+   onKeyDown={handleKeyDown}
+   className={cn('shadcn_cmdk relative h-auto overflow-y-auto', {
+    'h-[300px]': isOpen,
+   })}
+  >
+   <div className="sticky left-0 top-0">
     <CommandInput
-     ref={inputRef}
-     value={inputValue}
-     onValueChange={isLoading ? undefined : setInputValue}
-     onBlur={handleBlur}
-     onFocus={() => setOpen(true)}
      placeholder={placeholder}
-     disabled={disabled}
-     className="text-base"
+     ref={inputRef}
+     onBlur={handleBlur}
+     value={inputValue}
+     onFocus={() => setOpen(true)}
+     onValueChange={setInputValue}
     />
    </div>
-   <div className="relative mt-1">
+   <div className="relative mt-0">
     <div
      className={cn(
-      'absolute top-0 z-10 w-full rounded-xl bg-white outline-none animate-in fade-in-0 zoom-in-95',
-      isOpen ? 'block' : 'hidden'
+      'absolute top-0 z-30 hidden h-full w-full outline-none animate-in fade-in-0 zoom-in-95',
+      { block: isOpen }
      )}
     >
-     <CommandList className="rounded-lg ring-1 ring-slate-200">
-      {isLoading ? (
-       <CommandPrimitive.Loading>
-        <div className="p-1">
-         <Skeleton className="h-8 w-full" />
-        </div>
-       </CommandPrimitive.Loading>
-      ) : null}
-      {options.length > 0 && !isLoading ? (
+     <CommandList className="">
+      <CommandEmpty>No results found.</CommandEmpty>
+      {type === 'option' && options.length > 0 && (
        <CommandGroup>
-        {options.map(option => {
-         // const isSelected = selected?.value === option.value
-         return (
-          <CommandItem
-           key={option.value}
-           value={option.label}
-           onMouseDown={event => {
-            event.preventDefault();
-            event.stopPropagation();
-           }}
-           onSelect={() => handleSelectOption(option)}
-           className={cn('flex w-full items-center gap-2')}
-          >
-           {option.label}
-          </CommandItem>
-         );
-        })}
+        {options.map(option => (
+         <CommandItem
+          key={option.value}
+          value={option.label}
+          onSelect={val => handleSelect(val)}
+          onMouseDown={event => {
+           event.preventDefault();
+          }}
+          className="flex w-full items-center gap-2"
+         >
+          {option.label}
+         </CommandItem>
+        ))}
        </CommandGroup>
-      ) : null}
-      {!isLoading ? (
-       <CommandPrimitive.Empty className="select-none rounded-sm px-2 py-3 text-center text-sm">
-        {emptyMessage}
-       </CommandPrimitive.Empty>
-      ) : null}
+      )}
+      {type === 'group' &&
+       options.length > 0 &&
+       (options as GroupOption[]).map((group, groupIndex) => (
+        <React.Fragment key={group.heading + groupIndex}>
+         <CommandGroup heading={group.heading}>
+          {group.option.map(opt => (
+           <CommandItem
+            key={opt.value}
+            value={opt.label}
+            onSelect={val => handleSelect(val)}
+            onMouseDown={event => {
+             event.preventDefault();
+            }}
+            className="flex w-full items-center gap-2"
+           >
+            {opt.label}
+           </CommandItem>
+          ))}
+         </CommandGroup>
+         <CommandSeparator />
+        </React.Fragment>
+       ))}
      </CommandList>
     </div>
    </div>
-  </CommandPrimitive>
+  </Command>
  );
-};
+}
