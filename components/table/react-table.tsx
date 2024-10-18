@@ -43,8 +43,11 @@ export function DataTable<TData, TValue>({
  const { params } = useSearchURL();
  const tableSearch = params.get('qtable');
  useEffect(() => {
+  // Apply the global filter only if the tableSearch is not null
   if (tableSearch) {
    table.setGlobalFilter(tableSearch);
+  } else {
+   table.setGlobalFilter(''); // Reset filter when search term is cleared
   }
  }, [table, tableSearch]);
  if (isLoading) return <TableLoading length={columns.length} />;
