@@ -1,5 +1,4 @@
 'use client';
-import { API_URL } from '@/lib/constants';
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 import axios from 'axios';
 import useAuth from './use-auth';
@@ -20,7 +19,7 @@ export function useFetch<T>({ path, queryKey, config }: IUseFetch<T>) {
  const { token } = useAuth();
  if (!queryKey) throw new Error('queryKey is required');
  if (!path) throw new Error('path is required');
- const REQUEST_URL = `${API_URL}/${path}`;
+ const REQUEST_URL = `https://jsonplaceholder.typicode.com/${path}`;
 
  const fetchData = async (): Promise<T> => {
   try {
@@ -44,7 +43,7 @@ export function useFetch<T>({ path, queryKey, config }: IUseFetch<T>) {
   }
  };
 
- const { data, isLoading, refetch, status, error } = useQuery<T, Error>({
+ const query = useQuery<T, Error>({
   queryKey,
   queryFn: fetchData,
   refetchOnWindowFocus: false,
@@ -52,5 +51,5 @@ export function useFetch<T>({ path, queryKey, config }: IUseFetch<T>) {
   ...config,
  });
 
- return { data, isLoading, refetch, status, error };
+ return query;
 }
